@@ -44,7 +44,7 @@
         // Scores
         let leftScore = 0, rightScore = 0;
 
-        // NEW: Game State Flags and Message
+        // Game State Flags and Message
         let gameOver = false;
         let finalMessage = ""; // To store the message to display
 
@@ -78,7 +78,6 @@
             ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
         }
 
-        // NEW: Function to handle game over
         function endGame(winner) {
             gameOver = true;
             if (winner === "human") {
@@ -86,14 +85,11 @@
             } else { // winner === "ai"
                 finalMessage = "AI Dominates! You dared to challenge, and you fell.\nPerhaps touch some grass?";
             }
-            // You might want to stop the ball, paddles etc. here or just let draw handle it.
-            // For now, the 'if (gameOver) return;' in update() will stop game logic.
         }
 
-
         function draw() {
-            // Clear
-            drawRect(0, 0, 600, 400, "#111");
+            // Always draw base game elements first
+            drawRect(0, 0, 600, 400, "#111"); // Clear background
             // Net
             for (let i = 0; i < 400; i += 20)
                 drawRect(295, i, 10, 10, "#fff");
@@ -106,20 +102,44 @@
             drawText(leftScore, 150, 50);
             drawText(rightScore, 430, 50);
 
-            // NEW: Display final message if game is over
+            // Draw final message and its background LAST, so it's on top
             if (gameOver) {
+                // Calculate dimensions for the black background rectangle
+                const msgFontSize = 24;
+                const lineHeight = 30; // Based on your previous calculation
+                const lines = finalMessage.split('\n');
+                const textHeight = lines.length * lineHeight;
+                const padding = 20;
+
+                // Adjust text alignment temporarily to measure width
+                ctx.font = `${msgFontSize}px 'Orbitron', sans-serif`;
+                ctx.textAlign = "center";
+                let maxWidth = 0;
+                for (const line of lines) {
+                    const currentWidth = ctx.measureText(line).width;
+                    if (currentWidth > maxWidth) {
+                        maxWidth = currentWidth;
+                    }
+                }
+
+                const rectWidth = maxWidth + padding * 2;
+                const rectHeight = textHeight + padding;
+                const rectX = (canvas.width / 2) - (rectWidth / 2);
+                const rectY = (canvas.height / 2) - (rectHeight / 2);
+
+                // Draw black background rectangle
+                drawRect(rectX, rectY, rectWidth, rectHeight, "rgba(0, 0, 0, 0.9)"); // Semi-transparent black
+
+                // Draw the text
                 ctx.fillStyle = "#fff";
-                ctx.font = "24px 'Orbitron', sans-serif"; // Smaller font for the message
-                ctx.textAlign = "center"; // Center the text
-                const lines = finalMessage.split('\n'); // Split into lines for multi-line text
                 for (let i = 0; i < lines.length; i++) {
-                    ctx.fillText(lines[i], canvas.width / 2, canvas.height / 2 - 20 + (i * 30)); // Adjust Y position
+                    ctx.fillText(lines[i], canvas.width / 2, rectY + padding + (i * lineHeight));
                 }
             }
         }
 
         function update() {
-            // NEW: Stop updating game state if game is over
+            // Stop updating game state if game is over
             if (gameOver) return;
 
             // Player paddle movement
@@ -147,18 +167,22 @@
                 ballSpeedX = -ballSpeedX;
             }
 
-            // Score left
+            // Score left (AI scores)
             if (ballX - ballSize < 0) {
                 rightScore++;
+                // Console message for AI points
+                console.log(`Oh no! The AI has bested you a total of ${rightScore} times!`);
                 if (rightScore === 20) {
                     endGame("ai"); // AI wins
                 } else {
                     resetBall();
                 }
             }
-            // Score right
+            // Score right (Human scores)
             if (ballX + ballSize > 600) {
                 leftScore++;
+                // Console message for Human points (optional, but good symmetry)
+                console.log(`Yes! You scored! Your total: ${leftScore}. Keep fighting!`);
                 if (leftScore === 20) {
                     endGame("human"); // Human wins
                 } else {
