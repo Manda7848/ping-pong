@@ -15,7 +15,8 @@ Ready to dominate? Here's how you play:
 
 * **Right Paddle:**
     * This one's the real challenge! The **right paddle is controlled by the AI**, and it's set to "Pro Max" difficulty. Good luck!
-Play here: https://ping-pong-gules-gamma.vercel.app/
+---
+## Play here: https://ping-pong-gules-gamma.vercel.app/
 ---
 
 ## ⚙️ How It Works (Under the Hood)
