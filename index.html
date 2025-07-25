@@ -2,122 +2,337 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Pong Game</title>
+  <title>Bouncing DVD Logo - Fun Edition</title>
+  <link href="https://fonts.googleapis.com/css?family=Orbitron:700&display=swap" rel="stylesheet">
   <style>
-    body { background: #222; margin: 0; overflow: hidden; }
-    canvas { display: block; margin: 40px auto; background: #111; border: 2px solid #fff; }
-    h1 { color: #fff; text-align: center; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    #dvd-container {
+      position: absolute;
+      left: 0; top: 0;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #trail-canvas, #particle-canvas {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      display: block;
+    }
+    #dvd-logo {
+      position: absolute;
+      width: 180px;
+      height: 90px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      pointer-events: none;
+      color: #fff;
+      font-family: 'Orbitron', Arial, sans-serif;
+      font-weight: 700;
+      transition: color 0.1s linear;
+      z-index: 2;
+      filter: drop-shadow(0px 0px 16px #fff4);
+      will-change: transform;
+    }
+    #dvd-text {
+      font-size: 48px;
+      letter-spacing: 10px;
+      line-height: 1;
+      margin-bottom: 0;
+      margin-top: 0;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    #dvd-circle {
+      width: 66px;
+      height: 18px;
+      border-radius: 50%;
+      border: 5px solid currentColor;
+      margin-top: 2px;
+      background: transparent;
+      box-sizing: border-box;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    #congrats-message {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0,0,0,0.96);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      font-family: 'Orbitron', Arial, sans-serif;
+      font-size: 2.2em;
+      z-index: 999;
+      text-align: center;
+      letter-spacing: 2px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s;
+    }
+    #congrats-message.show {
+      opacity: 1;
+      pointer-events: auto;
+    }
   </style>
 </head>
 <body>
-  <h1>Pong Game</h1>
-  <canvas id="pong" width="600" height="400"></canvas>
+  <canvas id="trail-canvas"></canvas>
+  <canvas id="particle-canvas"></canvas>
+  <div id="dvd-container">
+    <div id="dvd-logo">
+      <div id="dvd-text">DVD</div>
+      <div id="dvd-circle"></div>
+    </div>
+    <div id="congrats-message">
+      congratulations<br>
+      you waited long enough for this many corner hits to happen<br>
+      now go touch grass
+    </div>
+  </div>
   <script>
-    const canvas = document.getElementById('pong');
-    const ctx = canvas.getContext('2d');
+    // ----- SETUP -----
+    const logo = document.getElementById('dvd-logo');
+    const logoText = document.getElementById('dvd-text');
+    const container = document.getElementById('dvd-container');
+    const congrats = document.getElementById('congrats-message');
+    const trailCanvas = document.getElementById('trail-canvas');
+    const trailCtx = trailCanvas.getContext('2d');
+    const particleCanvas = document.getElementById('particle-canvas');
+    const particleCtx = particleCanvas.getContext('2d');
 
-    // Paddle
-    const paddleWidth = 10, paddleHeight = 80;
-    let leftY = 160, rightY = 160, paddleSpeed = 5;
-
-    // Ball
-    let ballX = 300, ballY = 200, ballSize = 10;
-    let ballSpeedX = 4, ballSpeedY = 4;
-
-    // Scores
-    let leftScore = 0, rightScore = 0;
-
-    function drawRect(x, y, w, h, color) {
-      ctx.fillStyle = color;
-      ctx.fillRect(x, y, w, h);
+    function resizeCanvas() {
+      trailCanvas.width = particleCanvas.width = window.innerWidth;
+      trailCanvas.height = particleCanvas.height = window.innerHeight;
     }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
 
-    function drawCircle(x, y, r, color) {
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(x, y, r, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.fill();
-    }
+    // ----- LOGO STATE -----
+    const logoTexts = ['DVD', 'CD', 'VHS', 'BLU-RAY'];
+    let currentLogoText = 0;
 
-    function drawText(text, x, y) {
-      ctx.fillStyle = "#fff";
-      ctx.font = "32px Arial";
-      ctx.fillText(text, x, y);
-    }
+    let x = Math.random() * (window.innerWidth - 180);
+    let y = Math.random() * (window.innerHeight - 90);
+    let vx = (Math.random() > 0.5 ? 1 : -1) * (2.5 + Math.random() * 2);
+    let vy = (Math.random() > 0.5 ? 1 : -1) * (2.5 + Math.random() * 2);
 
-    function resetBall() {
-      ballX = 300;
-      ballY = 200;
-      ballSpeedX = -ballSpeedX;
-      ballSpeedY = 4 * (Math.random() > 0.5 ? 1 : -1);
-    }
+    let cornerCount = 0;
+    const CORNER_LIMIT = 1; // <<<< CHANGED HERE
 
-    function draw() {
-      // Clear
-      drawRect(0, 0, 600, 400, "#111");
-      // Net
-      for (let i = 0; i < 400; i += 20)
-        drawRect(295, i, 10, 10, "#fff");
-      // Paddles
-      drawRect(10, leftY, paddleWidth, paddleHeight, "#fff");
-      drawRect(580, rightY, paddleWidth, paddleHeight, "#fff");
-      // Ball
-      drawCircle(ballX, ballY, ballSize, "#fff");
-      // Scores
-      drawText(leftScore, 150, 50);
-      drawText(rightScore, 430, 50);
-    }
+    let running = true;
 
-    function update() {
-      // Ball movement
-      ballX += ballSpeedX;
-      ballY += ballSpeedY;
+    const EPS = 1.5;
 
-      // Collisions with top/bottom
-      if (ballY + ballSize > 400 || ballY - ballSize < 0)
-        ballSpeedY = -ballSpeedY;
+    // 3D Spin/Wobble
+    let logoSpin = 0;
+    let logoSpinVel = 0;
+    let logoWobble = 0;
+    let logoWobbleVel = 0;
 
-      // Left paddle collision
-      if (ballX - ballSize < 20 && ballY > leftY && ballY < leftY + paddleHeight) {
-        ballSpeedX = -ballSpeedX;
+    // ----- TRAIL -----
+    const trail = [];
+    const MAX_TRAIL = 64;
+    const TRAIL_OPACITY = 0.14;
+
+    // ----- PARTICLES -----
+    const particles = [];
+    function spawnParticles(px, py, color) {
+      for (let i = 0; i < 18; ++i) {
+        const angle = Math.random() * 2 * Math.PI;
+        const speed = 2 + Math.random() * 3;
+        particles.push({
+          x: px, y: py,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          alpha: 1,
+          color,
+          r: 3 + Math.random() * 5
+        });
       }
-      // Right paddle collision
-      if (ballX + ballSize > 580 && ballY > rightY && ballY < rightY + paddleHeight) {
-        ballSpeedX = -ballSpeedX;
-      }
-
-      // Score left
-      if (ballX - ballSize < 0) {
-        rightScore++;
-        resetBall();
-      }
-      // Score right
-      if (ballX + ballSize > 600) {
-        leftScore++;
-        resetBall();
-      }
-
-      // AI for right paddle
-      if (ballY > rightY + paddleHeight / 2 && rightY + paddleHeight < 400)
-        rightY += paddleSpeed;
-      else if (ballY < rightY + paddleHeight / 2 && rightY > 0)
-        rightY -= paddleSpeed;
     }
 
-    // Controls for left paddle (W/S)
-    window.addEventListener('keydown', function(e) {
-      if (e.key === 'w' && leftY > 0) leftY -= paddleSpeed * 2;
-      if (e.key === 's' && leftY + paddleHeight < 400) leftY += paddleSpeed * 2;
+    function randomColor() {
+      const h = Math.floor(Math.random() * 360);
+      return `hsl(${h}, 90%, 55%)`;
+    }
+
+    function animate() {
+      if (!running) return;
+
+      let prevX = x, prevY = y;
+      x += vx;
+      y += vy;
+
+      const logoW = 180;
+      const logoH = 90;
+      const maxX = window.innerWidth - logoW;
+      const maxY = window.innerHeight - logoH;
+
+      let hitX = false, hitY = false, hitCorner = false;
+
+      // "Real" bounce: reflect against the wall, not just set vx/vy to absolute values
+      // Left or right wall
+      if (x < 0) {
+        x = 0;
+        vx = -vx;
+        hitX = true;
+      } else if (x > maxX) {
+        x = maxX;
+        vx = -vx;
+        hitX = true;
+      }
+      // Top or bottom wall
+      if (y < 0) {
+        y = 0;
+        vy = -vy;
+        hitY = true;
+      } else if (y > maxY) {
+        y = maxY;
+        vy = -vy;
+        hitY = true;
+      }
+
+      // Check perfect corner hit
+      if (
+        (Math.abs(x) < EPS && Math.abs(y) < EPS) || // top-left
+        (Math.abs(x - maxX) < EPS && Math.abs(y) < EPS) || // top-right
+        (Math.abs(x) < EPS && Math.abs(y - maxY) < EPS) || // bottom-left
+        (Math.abs(x - maxX) < EPS && Math.abs(y - maxY) < EPS) // bottom-right
+      ) {
+        hitCorner = true;
+      }
+
+      // 3D spin/wobble on bounce
+      if (hitX || hitY) {
+        logoSpinVel += (Math.random() - 0.5) * 1.5 + (hitCorner ? 5 : 2.5);
+        logoWobbleVel += (Math.random() - 0.5) * 2 + (hitCorner ? 7 : 3);
+
+        // Change color and logo text
+        const newColor = randomColor();
+        logo.style.color = newColor;
+
+        // Next logo text
+        currentLogoText = (currentLogoText + 1) % logoTexts.length;
+        logoText.textContent = logoTexts[currentLogoText];
+
+        // Particle burst
+        const logoCenterX = x + logoW / 2;
+        const logoCenterY = y + logoH / 2;
+        spawnParticles(logoCenterX, logoCenterY, newColor);
+
+        // Only count perfect corners
+        if (hitCorner) {
+          cornerCount++;
+          console.log(`Corner hit! Total: ${cornerCount}`);
+          if (cornerCount >= CORNER_LIMIT) {
+            endGame();
+            return;
+          }
+        }
+      }
+
+      // Update 3D spin/wobble
+      logoSpin += logoSpinVel;
+      logoWobble += logoWobbleVel;
+      logoSpinVel *= 0.94;
+      logoWobbleVel *= 0.88;
+      logoSpin *= 0.92;
+      logoWobble *= 0.89;
+
+      // Move logo visually
+      logo.style.left = x + 'px';
+      logo.style.top = y + 'px';
+      logo.style.transform =
+        `rotateZ(${logoSpin}deg) rotateX(${logoWobble * 0.7}deg) rotateY(${logoWobble * 0.4}deg)`;
+
+      // Add to trail
+      trail.push({
+        x: x + logoW / 2,
+        y: y + logoH / 2,
+        color: logo.style.color
+      });
+      if (trail.length > MAX_TRAIL) trail.shift();
+
+      // Draw trail
+      drawTrail();
+
+      // Animate particles
+      animateParticles();
+
+      requestAnimationFrame(animate);
+    }
+
+    function drawTrail() {
+      trailCtx.clearRect(0, 0, trailCanvas.width, trailCanvas.height);
+      for (let i = 0; i < trail.length - 1; ++i) {
+        const p = trail[i];
+        const n = trail[i + 1];
+        trailCtx.beginPath();
+        trailCtx.moveTo(p.x, p.y);
+        trailCtx.lineTo(n.x, n.y);
+        const age = i / trail.length;
+        trailCtx.strokeStyle = p.color;
+        trailCtx.globalAlpha = (1 - age) * TRAIL_OPACITY;
+        trailCtx.lineWidth = 16 * (1 - age) + 1;
+        trailCtx.stroke();
+      }
+      trailCtx.globalAlpha = 1.0;
+    }
+
+    function animateParticles() {
+      particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+      for (let i = particles.length - 1; i >= 0; --i) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.97;
+        p.vy *= 0.97;
+        p.alpha *= 0.94;
+        if (p.alpha < 0.05) {
+          particles.splice(i, 1);
+          continue;
+        }
+        particleCtx.globalAlpha = p.alpha;
+        particleCtx.beginPath();
+        particleCtx.arc(p.x, p.y, p.r, 0, 2 * Math.PI);
+        particleCtx.fillStyle = p.color;
+        particleCtx.shadowColor = p.color;
+        particleCtx.shadowBlur = 16;
+        particleCtx.fill();
+        particleCtx.shadowBlur = 0;
+      }
+      particleCtx.globalAlpha = 1.0;
+    }
+
+    function endGame() {
+      running = false;
+      logo.style.display = 'none';
+      congrats.classList.add('show');
+    }
+
+    logo.style.color = randomColor();
+
+    window.addEventListener('resize', () => {
+      x = Math.min(x, window.innerWidth - 180);
+      y = Math.min(y, window.innerHeight - 90);
+      resizeCanvas();
     });
 
-    function game() {
-      update();
-      draw();
-      requestAnimationFrame(game);
-    }
-
-    game();
+    animate();
   </script>
 </body>
 </html>
